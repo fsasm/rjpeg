@@ -1,2 +1,4 @@
 test001.jpg: Empty image file with only JFIF header
 test002.jpg: Emtpy image file with JFIF header and other APPn segments to ignore.
+test003.jpg: Empty image file with JFIF header, APPn and COM segments to ignore.
+test004:jpg: Empty image file with broken JFIF header.

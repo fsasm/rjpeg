@@ -144,4 +144,16 @@ mod tests {
         let img = include_bytes!("../test/test002.jpg");
         assert!(parse_jpeg(img).is_done());
     }
+
+    #[test]
+    fn comment() {
+        let img = include_bytes!("../test/test003.jpg");
+        assert!(parse_jpeg(img).is_done());
+    }
+
+    #[test]
+    fn broken_jfif() {
+        let img = include_bytes!("../test/test004.jpg");
+        assert!(parse_jpeg(img).is_done());
+    }
 }
