@@ -36,9 +36,9 @@ pub struct JfifHeader<'a> {
 // TODO verify thumbnail size with header size
 named!(parse_jfif<JfifHeader>,
     do_parse!(
-        tag!(&[0xFF, 0xE0][..]) >> // APP0
+        tag!(&[0xFF, 0xE0]) >> // APP0
         len: be_u16 >>
-        tag!(&[0x4A, 0x46, 0x49, 0x46, 0x00][..]) >>
+        tag!(&[0x4A, 0x46, 0x49, 0x46, 0x00]) >>
         maj: be_u8 >>
         min: be_u8 >>
         units: be_u8 >>
@@ -60,39 +60,70 @@ named!(parse_jfif<JfifHeader>,
     )
 );
 
+pub enum TablesMisc<'a> {
+    DRI(u16),
+    APP(u8, &'a [u8]),
+    COM(&'a [u8]),
+    DHT,
+    DQT,
+}
+
 named!(parse_soi, tag!(&[0xFF, 0xD8]));
 named!(parse_eoi, tag!(&[0xFF, 0xD9]));
 
-named!(parse_comment,
+named!(seg_len<u16>, verify!(be_u16, |val: u16| val >= 2));
+
+named!(parse_com<TablesMisc>,
     do_parse!(
-        tag!(&[0xFF, 0xFE][..]) >>
-        len: be_u16 >>
+        tag!(&[0xFF, 0xFE]) >>
+        len: seg_len >>
         com: take!(len - 2) >>
-        (com)
+        (TablesMisc::COM(com))
     )
 );
 
-named!(parse_appn,
+named!(parse_appn<TablesMisc>,
     do_parse!(
         tag!(&[0xFF]) >>
-        alt!(
+        n: alt!(
             tag!(&[0xE0]) | tag!(&[0xE1]) | tag!(&[0xE2]) | tag!(&[0xE3]) |
             tag!(&[0xE4]) | tag!(&[0xE5]) | tag!(&[0xE6]) | tag!(&[0xE7]) |
             tag!(&[0xE8]) | tag!(&[0xE9]) | tag!(&[0xEA]) | tag!(&[0xEB]) |
             tag!(&[0xEC]) | tag!(&[0xED]) | tag!(&[0xEE]) | tag!(&[0xEF])
         ) >>
-        len: be_u16 >>
+        len: seg_len >>
         data: take!(len - 2) >>
-        (data)
+        (TablesMisc::APP(n[0] - 0xE0, data))
     )
+);
+
+named!(parse_dnl<u16>,
+    do_parse!(
+        tag!(&[0xFF, 0xDC]) >>
+        tag!(&[0x00, 0x04]) >> // length is fixed to 4
+        dnl: verify!(be_u16, |val: u16| val > 0) >>
+        (dnl)
+    )
+);
+
+named!(parse_dri<TablesMisc>,
+    do_parse!(
+        tag!(&[0xFF, 0xDD]) >>
+        tag!(&[0x00, 0x04]) >> // length is fixed to 4
+        dri: be_u16 >>
+        (TablesMisc::DRI(dri))
+    )
+);
+
+named!(parse_tab_misc<TablesMisc>,
+    alt!(parse_dri | parse_appn | parse_com)
 );
 
 named!(pub parse_jpeg<JfifHeader>,
     do_parse!(
         parse_soi >>
         jfif_header: parse_jfif >>
-        many0!(parse_appn) >>
-        many0!(parse_comment) >>
+        many0!(parse_tab_misc) >>
         parse_eoi >>
         (jfif_header)
     )
