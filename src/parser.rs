@@ -3,7 +3,7 @@ use nom::*;
 
 // JFIF
 #[derive(Debug, PartialEq)]
-enum Units {
+pub enum Units {
     Pixel,
     DotsPerInch,
     DotsPerCm,
@@ -22,7 +22,7 @@ impl Units {
 }
 
 #[derive(Debug, PartialEq)]
-struct JfifHeader<'a> {
+pub struct JfifHeader<'a> {
     maj_ver: u8,
     min_ver: u8,
     units: Units,
@@ -87,6 +87,16 @@ named!(parse_appn,
     )
 );
 
+named!(pub parse_jpeg<JfifHeader>,
+    do_parse!(
+        parse_soi >>
+        jfif_header: parse_jfif >>
+        many0!(parse_comment) >>
+        parse_eoi >>
+        (jfif_header)
+    )
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,19 +104,7 @@ mod tests {
     #[test]
     fn empty() {
         let img = include_bytes!("../test/test001.jpg");
-        assert_eq!(parse_soi(&img[..]), IResult::Done(&img[2..], &[0xFF, 0xD8][..]));
-        assert_eq!(parse_jfif(&img[2..]), IResult::Done(&img[20..],
-            JfifHeader {
-                maj_ver: 1,
-                min_ver: 2,
-                units:Units::Pixel,
-                hor_dens: 1,
-                ver_dens: 1,
-                thumb_width: 0,
-                thumb_height: 0,
-                thumbnail: &[][..]
-            }
-        ));
-        assert_eq!(parse_eoi(&img[20..]), IResult::Done(&[][..], &[0xFF, 0xD9][..]));
+
+        assert!(parse_jpeg(img).is_done());
     }
 }
