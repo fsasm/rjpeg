@@ -1,1 +1,2 @@
 test001.jpg: Empty image file with only JFIF header
+test002.jpg: Emtpy image file with JFIF header and other APPn segments to ignore.

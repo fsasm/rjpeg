@@ -67,7 +67,7 @@ named!(parse_comment,
     do_parse!(
         tag!(&[0xFF, 0xFE][..]) >>
         len: be_u16 >>
-        com: take!(len) >>
+        com: take!(len - 2) >>
         (com)
     )
 );
@@ -82,7 +82,7 @@ named!(parse_appn,
             tag!(&[0xEC]) | tag!(&[0xED]) | tag!(&[0xEE]) | tag!(&[0xEF])
         ) >>
         len: be_u16 >>
-        data: take!(len) >>
+        data: take!(len - 2) >>
         (data)
     )
 );
@@ -91,6 +91,7 @@ named!(pub parse_jpeg<JfifHeader>,
     do_parse!(
         parse_soi >>
         jfif_header: parse_jfif >>
+        many0!(parse_appn) >>
         many0!(parse_comment) >>
         parse_eoi >>
         (jfif_header)
@@ -104,7 +105,12 @@ mod tests {
     #[test]
     fn empty() {
         let img = include_bytes!("../test/test001.jpg");
+        assert!(parse_jpeg(img).is_done());
+    }
 
+    #[test]
+    fn ign_appn() {
+        let img = include_bytes!("../test/test002.jpg");
         assert!(parse_jpeg(img).is_done());
     }
 }
