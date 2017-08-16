@@ -33,7 +33,6 @@ pub struct JfifHeader<'a> {
     thumbnail: &'a [u8],
 }
 
-// TODO verify thumbnail size with header size
 named!(parse_jfif<JfifHeader>,
     do_parse!(
         tag!(&[0xFF, 0xE0]) >> // APP0
@@ -45,7 +44,7 @@ named!(parse_jfif<JfifHeader>,
         xdens: be_u16 >>
         ydens: be_u16 >>
         xthumb: be_u8 >>
-        ythumb: be_u8 >>
+        ythumb: verify!(be_u8, |yt| (yt as u16 * xthumb as u16 * 3) + 16 == len) >>
         thumb: take!(xthumb * ythumb * 3) >>
         (JfifHeader {
             maj_ver: maj,
@@ -154,6 +153,6 @@ mod tests {
     #[test]
     fn broken_jfif() {
         let img = include_bytes!("../test/test004.jpg");
-        assert!(parse_jpeg(img).is_done());
+        assert!(parse_jpeg(img).is_err());
     }
 }
