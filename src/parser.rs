@@ -183,6 +183,52 @@ named!(parse_dht<Vec<HuffTable> >,
 );
 */
 
+pub struct CompParam {
+    id: u8,
+    hor_sampling: u8,
+    ver_sampling: u8,
+    quant_selector: u8,
+}
+
+pub struct FrameHeader{
+    precision: u8,
+    height: u16,
+    width: u16,
+    comp_params: Vec<CompParam>
+}
+
+named!(parse_comp_param<CompParam>,
+    do_parse!(
+        id: be_u8 >>
+        sampling: be_u8 >>
+        selector: be_u8 >>
+        (CompParam {
+            id: id,
+            hor_sampling: sampling >> 4,
+            ver_sampling: sampling & 0x0F,
+            quant_selector: selector
+        })
+    )
+);
+
+named!(parse_sof0<FrameHeader>,
+    do_parse!(
+        tag!(&[0xFF, 0xC0]) >>
+        len: seg_len >>
+        prec: be_u8 >>
+        height: be_u16 >>
+        width: be_u16 >>
+        num_comp: be_u8 >>
+        comp_params: many_m_n!(num_comp as usize, num_comp as usize, parse_comp_param) >>
+        (FrameHeader {
+            precision: prec,
+            height: height,
+            width: width,
+            comp_params: comp_params
+        })
+    )
+);
+
 #[derive(Debug, PartialEq)]
 pub struct Jpeg<'a> {
     jfif_header: JfifHeader<'a>,
@@ -199,6 +245,7 @@ named!(pub parse_jpeg<Jpeg>,
         parse_soi >>
         jfif_header: parse_jfif >>
         tables: many0!(parse_tab_misc) >>
+        opt!(parse_sof0) >>
         parse_eoi >>
         (Jpeg {
             jfif_header: jfif_header,
@@ -240,5 +287,4 @@ mod tests {
         let img = include_bytes!("../test/test005.jpg");
         assert!(parse_jpeg(img).is_done());
     }
-
 }
