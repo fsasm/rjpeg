@@ -44,8 +44,9 @@ named!(parse_jfif<JfifHeader>,
         xdens: be_u16 >>
         ydens: be_u16 >>
         xthumb: be_u8 >>
-        ythumb: verify!(be_u8, |yt| (yt as u16 * xthumb as u16 * 3) + 16 == len) >>
-        thumb: take!(xthumb * ythumb * 3) >>
+        ythumb: be_u8 >>
+        thumb_size: verify!(value!(xthumb as u16 * ythumb as u16 * 3), |val| val + 16 == len) >>
+        thumb: take!(thumb_size) >>
         (JfifHeader {
             maj_ver: maj,
             min_ver: min,
@@ -58,6 +59,13 @@ named!(parse_jfif<JfifHeader>,
         })
     )
 );
+
+pub struct HuffTable<'a> {
+    class: u8,
+    dest: u8,
+    cnt_len: [u8; 16],
+    huff_val: &'a [u8]
+}
 
 pub enum TablesMisc<'a> {
     DRI(u16),
@@ -113,6 +121,56 @@ named!(parse_dri<TablesMisc>,
         (TablesMisc::DRI(dri))
     )
 );
+
+fn sum(arr: [u8; 16]) -> u16 {
+    arr.iter().fold(0u16, |acc, x| acc + (*x) as u16)
+}
+
+named!(parse_huffhead<(u8, u8, [u8; 16], u16)>,
+    do_parse!(
+        cd: verify!(be_u8, |val| (val >> 4) < 2u8 && (val & 0x0F) < 4u8) >>
+        count_len: count_fixed!(u8, be_u8, 16) >>
+        sum: verify!(value!(sum(count_len)), |val| val <= 256) >>
+        (cd >> 4, cd & 0x0F, count_len, sum)
+    )
+);
+
+named!(parse_hufftable<HuffTable>,
+    do_parse!(
+        head: parse_huffhead >>
+        huffvals: take!(head.3) >>
+        (HuffTable {
+            class: head.0,
+            dest: head.1,
+            cnt_len: head.2,
+            huff_val: huffvals
+        })
+    )
+);
+
+named!(parse_dht<&[u8]>,
+    do_parse!(
+        tag!(&[0xFF, 0xC4]) >>
+        len: seg_len >>
+        body: take!(len - 2) >>
+        (body)
+    )
+);
+
+/* FIXME also parse the huffman tables. Problem is that the number of
+ * tables depends on the number of symbols in a table.
+named!(parse_dht<Vec<HuffTable> >,
+    do_parse!(
+        tag!(&[0xFF, 0xC4]) >>
+        len: seg_len >>
+        body: take!(len - 2) >>
+        (fold_many0!(body, parse_hufftable, Vec::new(), |mut v: Vec<_>, elem| {
+            v.push(elem);
+            v
+        }).unwrap().1)
+    )
+);
+*/
 
 named!(parse_tab_misc<TablesMisc>,
     alt!(parse_dri | parse_appn | parse_com)
