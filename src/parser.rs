@@ -71,8 +71,8 @@ pub enum TablesMisc<'a> {
     DRI(u16),
     APP(u8, &'a [u8]),
     COM(&'a [u8]),
-    DHT,
-    DQT,
+    DHT(&'a [u8]),
+    DQT(&'a [u8]),
 }
 
 named!(parse_soi, tag!(&[0xFF, 0xD8]));
@@ -148,12 +148,22 @@ named!(parse_hufftable<HuffTable>,
     )
 );
 
-named!(parse_dht<&[u8]>,
+named!(parse_dht<TablesMisc>,
     do_parse!(
         tag!(&[0xFF, 0xC4]) >>
         len: seg_len >>
         body: take!(len - 2) >>
-        (body)
+        (TablesMisc::DHT(body))
+    )
+);
+
+/* TODO like for DHT this is just a dummy parser */
+named!(parse_dqt<TablesMisc>,
+    do_parse!(
+        tag!(&[0xFF, 0xDB]) >>
+        len: seg_len >>
+        body: take!(len - 2) >>
+        (TablesMisc::DQT(body))
     )
 );
 
@@ -173,7 +183,7 @@ named!(parse_dht<Vec<HuffTable> >,
 */
 
 named!(parse_tab_misc<TablesMisc>,
-    alt!(parse_dri | parse_appn | parse_com)
+    alt!(parse_dri | parse_appn | parse_com | parse_dht | parse_dqt)
 );
 
 named!(pub parse_jpeg<JfifHeader>,
