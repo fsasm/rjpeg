@@ -67,6 +67,7 @@ pub struct HuffTable<'a> {
     huff_val: &'a [u8]
 }
 
+#[derive(Debug, PartialEq)]
 pub enum TablesMisc<'a> {
     DRI(u16),
     APP(u8, &'a [u8]),
@@ -182,17 +183,27 @@ named!(parse_dht<Vec<HuffTable> >,
 );
 */
 
+#[derive(Debug, PartialEq)]
+pub struct Jpeg<'a> {
+    jfif_header: JfifHeader<'a>,
+    tables: Vec<TablesMisc<'a>>
+}
+
+
 named!(parse_tab_misc<TablesMisc>,
     alt!(parse_dri | parse_appn | parse_com | parse_dht | parse_dqt)
 );
 
-named!(pub parse_jpeg<JfifHeader>,
+named!(pub parse_jpeg<Jpeg>,
     do_parse!(
         parse_soi >>
         jfif_header: parse_jfif >>
-        many0!(parse_tab_misc) >>
+        tables: many0!(parse_tab_misc) >>
         parse_eoi >>
-        (jfif_header)
+        (Jpeg {
+            jfif_header: jfif_header,
+            tables: tables
+        })
     )
 );
 
@@ -223,4 +234,11 @@ mod tests {
         let img = include_bytes!("../test/test004.jpg");
         assert!(parse_jpeg(img).is_err());
     }
+
+    #[test]
+    fn empty_dht_dqt() {
+        let img = include_bytes!("../test/test005.jpg");
+        assert!(parse_jpeg(img).is_done());
+    }
+
 }
